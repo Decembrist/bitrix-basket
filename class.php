@@ -16,9 +16,9 @@ if (!Loader::includeModule('iblock') || !Loader::includeModule('sale') || !Loade
 }
 
 /**
- * Class OkrBasketPage
+ * Class LocalBasketPage
  */
-class OkrBasketPage extends \CBitrixComponent implements Controllerable
+class LocalBasketPage extends \CBitrixComponent implements Controllerable
 {
     /**
      * @var int
@@ -226,25 +226,29 @@ class OkrBasketPage extends \CBitrixComponent implements Controllerable
             $iPrice = $arItem->getPrice();
             $iQuantity = $arItem->getQuantity();
             $iAllSum = ($iPrice * $iQuantity);
-
+            $iPriceOld = $iPrice;
             $code = $arItem->getBasketCode();
-            if (!empty($arDiscount[$code])) {
+            $bDiscount = false;
+            if (!empty($arDiscount[$code]) && (int)$arDiscount[$code]['DISCOUNT']) {
                 $iAllSum = $arDiscount[$code]['PRICE'] * $arItem->getQuantity();
-
-                $this->iCartSum += $iAllSum;
-
+                $bDiscount = true;
                 $iPrice = $arDiscount[$code]['PRICE'];
             }
+
+            $this->iCartSum += $iAllSum;
 
             $arItemsIds[] = $iId;
 
             $arBasketItems[$iId] = [
                 'NAME' => $arItem->getField('NAME'),
                 'QUANTITY' => $iQuantity,
+                'IS_DISCOUNT' => $bDiscount,
                 'PRODUCT_ID' => $iId,
                 'BASKET_ID' => $arItem->getId(),
                 'PRICE' => $iPrice,
                 'PRICE_FORMAT' => CurrencyFormat($iPrice, 'RUB'),
+                'PRICE_OLD' => $iPriceOld,
+                'PRICE_OLD_FORMAT' => CurrencyFormat($iPriceOld, 'RUB'),
                 'ALL_PRICE' => $iAllSum,
                 'ALL_PRICE_FORMAT' => CurrencyFormat($iAllSum, 'RUB')
             ];
@@ -255,27 +259,10 @@ class OkrBasketPage extends \CBitrixComponent implements Controllerable
                 ['=ID' => $arItemsIds],
                 false,
                 false,
-                ['ID', 'PREVIEW_PICTURE', 'DETAIL_PICTURE', 'DETAIL_PAGE_URL', 'PROPERTY_ARTICLE']
+                ['ID', 'PREVIEW_TEXT']
             );
             while ($arRow = $oIBItems->GetNext()) {
-                if ($arRow['PREVIEW_PICTURE'] || $arRow['DETAIL_PICTURE']) {
-                    $idPicture = !empty($arRow['PREVIEW_PICTURE']) ?
-                        $arRow['PREVIEW_PICTURE'] : $arRow['DETAIL_PICTURE'];
-
-                    $arRow['PICTURE'] = \CFile::ResizeImageGet(
-                        $idPicture,
-                        [
-                            'width' => $this->arParams['IMAGE_PARAMS']['WIDTH'],
-                            'height' => $this->arParams['IMAGE_PARAMS']['HEIGHT'],
-                        ],
-                        BX_RESIZE_IMAGE_PROPORTIONAL_ALT,
-                        true
-                    );
-                }
-
-                $arBasketItems[$arRow['ID']]['PICTURE'] = $arRow['PICTURE'];
-                $arBasketItems[$arRow['ID']]['DETAIL_PAGE_URL'] = $arRow['DETAIL_PAGE_URL'];
-                $arBasketItems[$arRow['ID']]['ARTICLE'] = $arRow['PROPERTY_ARTICLE_VALUE'];
+                $arBasketItems[$arRow['ID']]['DESCRIPTION'] = $arRow['PREVIEW_TEXT'];
             }
         }
 
@@ -297,7 +284,6 @@ class OkrBasketPage extends \CBitrixComponent implements Controllerable
 
         if (count($arBasketItems)) {
             $this->arResult['ITEMS'] = $arBasketItems;
-            $this->arResult['COUNT_ITEMS'] = array_sum($this->getCurBasket()->getQuantityList());
             $this->arResult['ALL_PRICE'] = $priceAll;
             $this->arResult['ALL_PRICE_FORMAT'] = CurrencyFormat($priceAll, 'RUB');
         }
